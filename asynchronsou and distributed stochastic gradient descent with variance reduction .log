@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2016.1.10)  6 APR 2016 20:19
+This is pdfTeX, Version 3.14159265-2.6-1.40.16 (TeX Live 2015) (preloaded format=pdflatex 2016.1.10)  13 APR 2016 19:40
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -382,8 +382,16 @@ Package footmisc Info: Declaring symbol style lamport*-robust on input line 924
 LaTeX Warning: Unused global option(s):
     [finalsubmission].
 
-No file "asynchronsou and distributed stochastic gradient descent with variance
- reduction ".aux.
+
+(./asynchronsou and distributed stochastic gradient descent with variance reduc
+tion .aux
+
+LaTeX Warning: Label `equa_gamma_convex' multiply defined.
+
+
+LaTeX Warning: Label `performance_evaluation' multiply defined.
+
+)
 \openout1 = `"asynchronsou and distributed stochastic gradient descent with var
 iance reduction .aux"'.
 
@@ -400,7 +408,7 @@ LaTeX Font Info:    ... okay on input line 36.
 LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 36.
 LaTeX Font Info:    ... okay on input line 36.
 LaTeX Font Info:    Try loading font information for OT1+ptm on input line 36.
-(/usr/local/texlive/2015/texmf-dist/tex/latex/psnfss/ot1ptm.fd
+ (/usr/local/texlive/2015/texmf-dist/tex/latex/psnfss/ot1ptm.fd
 File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
 )
 LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
@@ -565,10 +573,6 @@ LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.4> not available
 LaTeX Warning: Citation `Johnson:9MAvkbgy' on page 1 undefined on input line 13
 2.
 
-
-LaTeX Warning: Reference `algorithm_dis_svrg' on page 1 undefined on input line
- 132.
-
 [1{/usr/local/texlive/2015/texmf-var/fonts/map/pdftex/updmap/pdftex.map}
 
 
@@ -577,34 +581,48 @@ Underfull \hbox (badness 3260) in paragraph at lines 218--218
  \OT1/phv/b/sc/12 5 Op-ti-miza-tion of asyn-chronous and
  []
 
+[2] <figures/evaluation_accelerated_factor.pdf, id=22, 578.16pt x 433.62pt>
+File: figures/evaluation_accelerated_factor.pdf Graphic file (type pdf)
 
-LaTeX Warning: Reference `equa_l_smooth3' on page 2 undefined on input line 225
-.
+<use figures/evaluation_accelerated_factor.pdf>
+Package pdftex.def Info: figures/evaluation_accelerated_factor.pdf used on inpu
+t line 232.
+(pdftex.def)             Requested size: 216.72015pt x 162.53432pt.
+
+<figures/evaluation_random_strategy.pdf, id=23, 578.16pt x 433.62pt>
+File: figures/evaluation_random_strategy.pdf Graphic file (type pdf)
+
+<use figures/evaluation_random_strategy.pdf>
+Package pdftex.def Info: figures/evaluation_random_strategy.pdf used on input l
+ine 250.
+(pdftex.def)             Requested size: 216.72015pt x 162.53432pt.
+ [3 <./figures/evaluation_accelerated_factor.pdf> <./figures/evaluation_random_
+strategy.pdf
+
+pdfTeX warning: /Library/TeX/texbin/pdflatex (file ./figures/evaluation_random_
+strategy.pdf): PDF inclusion: multiple pdfs with page group included in a singl
+e page
+>]
+
+LaTeX Warning: Citation `Zhang:2015tp' on page 4 undefined on input line 266.
 
 
-Underfull \vbox (badness 2245) has occurred while \output is active []
-
- [2]
-
-LaTeX Warning: Citation `Zhang:2015tp' on page 3 undefined on input line 252.
+LaTeX Warning: Citation `Zhang:2015tp' on page 4 undefined on input line 266.
 
 
-LaTeX Warning: Citation `Zhang:2015tp' on page 3 undefined on input line 252.
+LaTeX Warning: Citation `Zhang:2015tp' on page 4 undefined on input line 266.
 
 
-LaTeX Warning: Citation `Zhang:2015tp' on page 3 undefined on input line 252.
+LaTeX Warning: Citation `Zhang:2015tp' on page 4 undefined on input line 266.
 
 
-LaTeX Warning: Citation `Zhang:2015tp' on page 3 undefined on input line 252.
+LaTeX Warning: Citation `Zhang:2015tp' on page 4 undefined on input line 266.
 
 
-LaTeX Warning: Citation `Zhang:2015tp' on page 3 undefined on input line 252.
+LaTeX Warning: Citation `Zhang:2015tp' on page 4 undefined on input line 266.
 
 
-LaTeX Warning: Citation `Zhang:2015tp' on page 3 undefined on input line 252.
-
-
-LaTeX Warning: Citation `Zhang:2015tp' on page 3 undefined on input line 252.
+LaTeX Warning: Citation `Zhang:2015tp' on page 4 undefined on input line 266.
 
 No file "asynchronsou and distributed stochastic gradient descent with variance
  reduction ".bbl.
@@ -612,24 +630,24 @@ No file "asynchronsou and distributed stochastic gradient descent with variance
 Package balance Warning: You have called \balance in second column
 (balance)                Columns might not be balanced.
 
-[3]
+[4]
 (./asynchronsou and distributed stochastic gradient descent with variance reduc
 tion .aux)
 
 LaTeX Warning: There were undefined references.
 
 
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
+LaTeX Warning: There were multiply-defined labels.
 
  ) 
 Here is how much of TeX's memory you used:
- 4767 strings out of 493089
- 69702 string characters out of 6134842
- 139887 words of memory out of 5000000
- 8092 multiletter control sequences out of 15000+600000
- 98008 words of font info for 214 fonts, out of 8000000 for 9000
+ 4786 strings out of 493089
+ 70403 string characters out of 6134842
+ 140070 words of memory out of 5000000
+ 8104 multiletter control sequences out of 15000+600000
+ 99162 words of font info for 215 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 38i,15n,26p,1646b,329s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 38i,15n,26p,1718b,329s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/local/texlive/2015/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/local/t
 exlive/2015/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/local/te
 xlive/2015/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/local/texl
@@ -644,10 +662,10 @@ b8a.pfb></usr/local/texlive/2015/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></
 usr/local/texlive/2015/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></usr/local
 /texlive/2015/texmf-dist/fonts/type1/urw/zapfding/uzdr.pfb>
 Output written on "asynchronsou and distributed stochastic gradient descent wit
-h variance reduction .pdf" (3 pages, 123062 bytes).
+h variance reduction .pdf" (4 pages, 165720 bytes).
 PDF statistics:
- 67 PDF objects out of 1000 (max. 8388607)
- 48 compressed objects within 1 object stream
+ 181 PDF objects out of 1000 (max. 8388607)
+ 81 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
- 1 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 11 words of extra memory for PDF output out of 10000 (max. 10000000)
 

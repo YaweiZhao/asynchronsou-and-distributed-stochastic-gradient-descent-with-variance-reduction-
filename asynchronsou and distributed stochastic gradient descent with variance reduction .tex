@@ -224,19 +224,33 @@ Generally, variance reduction technique accelerates machine learning algorithms 
 
 Based on the inequality \ref{equa_l_smooth3}, when $b$ is valued the optimal weight, i.e., $w^\ast$, $\forall$ $w$, it holds that $\parallel\nabla f_i(w)\parallel \le C$. That is, when the parameters are updated, the absolute value of the gradient is bounded by a constant. Besides, the gradient of parameters decreases when such parameters approach to the optimal state. Especially, when the parameters are close to  the optimal state, their gradient reaches zero approximately. Therefore, we introduce an accelerated factor $\sigma$ with $\sigma=\parallel \nabla f_i(w)\parallel$. The learning rate of our SGD contains two ingredients: the constant and the accelerated factor. The constant part of DisSGD prevalents  it to get struck at the local optimal state; while the accelerated factor makes DisSGD converge at a more than constant rate. Furthermore, since the gradient of  each function $f_i(w)$ has an upper bound, the accelerated factor do not become very large and lead to the divergence of the objection. 
 
+As illustrated in Fig. \ref{figure_evaluation_accelerated_factor}, we deploy such an accelerated factor in linear regression tasks. Here, the evaluation test is conducted on a machine instead of a cluster. The dataset is \emph{YearPredictMSD} which is the biggest dataset we can find to conduct linear regression tasks. The settings of this evaluation test  is and more evaluations are presented in Section \label{performance_evaluation}. 
+The solid lines represent the machine learning task with the basic learning rate $\eta \mathrm{=}0.001$; while the dotted lines stands for the machine learning task with the basic learning rate $\eta \mathrm{=}0.01$. Additionally, the blue lines means that the machine learning algorithm is trained by using a constant learning rate, but the red lines means that such machine learning algorithm is trained by using an incremental learning rate. The incremental learning rate consists of a basic learning rate and a accelerated factor. We can get two important observations from Fig. \ref{figure_evaluation_accelerated_factor}. First, the learning rate with an accelerated factor makes the machine learning algorithm converges faster than the learning rate without such a accelerated factor. Second, such benefits due to the accelerated factor becomes large when the basic learning rate increases. Shortly,  the accelerated factor gives rise to obvious benefits for the machine learning algorithms.
+
+\begin{figure}
+\centering
+\subfigure{\includegraphics[width=0.86\columnwidth]{figures/evaluation_accelerated_factor}}
+\caption{DisSVRG with the accelerated factor converges faster than DisSVRG.}
+\label{figure_evaluation_accelerated_factor}
+\end{figure}
 
 
-\subsection{Adaptive strategy of random updates with window of loss function}
+
+\subsection{Adaptive strategy of the random updates}
+
+Since DisSVRG needs the strategy of random updates in its inner loop, it is important to identify how many random updates in an epoch is appropriate to achieve a good tradeoff between time and accuracy.  As illustrated in the inner loop of Algorithm \ref{algorithm_dis_svrg}, $m$ represents the number of random updates for an epoch. First, $m$ cannot be given a large number such as $O(n)$. Here, $n$ means the size of the training data.  In order to maintain a satisfied accuracy, DisSVRG have to conduct the inner loop serval times, which consumes much time since the training data becomes extremely huge such as millions or billions of samples. Especially, we can get billions or trillions of samples from sensors in the world or Internet, a large $m$ like $O(n)$ makes the runtime of DisSVRG unacceptable.  On the other hand, $m$ cannot be set a small value straightly.    To gain a high accuracy of the objection function, a small $m$ leads to many epochs of DisSVRG. However, an average gradient is needed for  an epoch, which leads to $n$ deprivation operations. Therefore, a small $m$ costs too much time due to the deprivation operations. As illustrated in Fig. \ref{figure_evaluation_random_strategy}, we conduct an evaluation test on a  machine by varying the value of $m$. Here, the dataset is still \emph{YearPredictMSD}, and the learning rate, i.e., $\theta$ is set to a constant with $\theta=10^{-5}$. It is obvious that a large $m$ brings a fast convergence of the objective function because such a large value of $m$ gets rid of frequent computation of the average gradient.
+
+Additionally, a cluster such as EC2 is often heterogenous so that machines in the clusters perform differently due to the diversity of the hardware. Intuitively, some machines in the cluster conduct DisSVRG  fast; while others perform DisSVRG slowly.  Therefore, it is suitable and practical that the number of inner loops of DisSVRG, i.e., $m$, should be flexible to be adjusted for each a machine. In other words, DisSVRG should allow that $m$ on different machines can be set a different value. Intuitively, the machines which run fast should have a larger $m$ than the machines which run slow. Although the staleness synchronous protocol, i.e., SSP, allows a delay bound for such those machines which runs slow, those machines running fast have to wait the machines running slow until the delay is achieved.  This is usually called the ''the straggler problem'.  
+
+We adopt an adaptive strategy of the random updates which dynamically adjust $m$ in order to reduce the waiting time caused by the straggler problem. When an epoch, e.g., $t$, of DisSVRG is completed, the updated parameters on the local machine will be pushed to a server. If the delay bound is denoted by $\tau$, the server will check the epochs of other machines. If there exists at least one machine which has not finished the $t-\frac{\tau}{2}$ epoch, then the fast machine increases its number of the inner loop, i.e., $m$, to $m+\delta$. Here, $\delta$ is a constant non-negative integer. By using this adaptive strategy, the fast machines will spend more time on computing the updates of parameters than the slow machines, which not only reduces the waiting time caused by the straggler problem, but also improves the convergency of DisSVRG. 
 
 
-
-
-
-
-
-
-
-
+\begin{figure}
+\centering
+\subfigure{\includegraphics[width=0.86\columnwidth]{figures/evaluation_random_strategy}}
+\caption{A large $m$ leads to a fast convergence for DisSVRG.}
+\label{figure_evaluation_random_strategy}
+\end{figure}
 
 
 
