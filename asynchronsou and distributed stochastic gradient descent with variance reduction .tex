@@ -12,8 +12,7 @@
 \fi
 
 \setlength{\textfloatsep}{3pt plus 1pt minus 0.5pt}
-
-%\usepackage{appendix}
+\usepackage[hyperfootnotes=true]{hyperref}
 \usepackage{amssymb}
 \usepackage{algorithm}
 %\usepackage[noend]{algorithmic}
@@ -25,8 +24,8 @@
 \usepackage{epsfig,tabularx,amssymb,amsmath,subfigure,multirow,booktabs}
 \usepackage{balance}
 \usepackage{bm}
-%\usepackage[noend]{algpseudocode}
-\usepackage{algpseudocode}
+\usepackage[noend]{algpseudocode}
+%\usepackage{algpseudocode}
 \usepackage{epsfig,subfigure}
 \usepackage{mathptmx}
 \usepackage{url}
@@ -35,24 +34,25 @@
 
 \begin{document}
 
-\title{Accelerate Distributed Stochastic Gradient Descent with Asynchronous Communication Protocol}
+\title{Distributed and Asynchronous Stochastic Gradient Descent with Variance Reduction}
 
 \author{Yuewei~Ming,
 Yawei~Zhao,
-Deke~Guo~\IEEEmembership{Member,~IEEE,}
+Chengkun~Wu,
+Kuan~Li,
 Jianping~Yin
 \IEEEcompsocitemizethanks
-{\IEEEcompsocthanksitem Y. Zhao, Y. Ming, and J. Yin are with the College of Computer, National University of Defense Technology, Changsha 410073, P.R. China. E-mail: \{zhaoyawei09, jpyin\}@nudt.edu.cn, and myw123@163.com.
-\IEEEcompsocthanksitem D. Guo is with the Science and Technology on Information System Engineering Laboratory, National University of Defense Technology, Changsha 410073, P.R. China. E-mail: guodeke@gmail.com.%\IEEEcompsocthanksitem J. Xu is with the School of Computer, Electronics and Information, Guangxi University, Nanning 530004, P.R. China. E-mail: xujia@gxu.edu.cn.
+{\IEEEcompsocthanksitem Y. Ming, Y. Zhao, C. Wu, K. Li and J. Yin are with the College of Computer, National University of Defense Technology, Changsha 410073, P.R. China. E-mail: myw123@163.com, zhaoyawei09@nudt.edu.cn, wchknudt@163.com, li.kuan@163.com, and jpyin@nudt.edu.cn.
+%\IEEEcompsocthanksitem D. Guo is with the Science and Technology on Information System Engineering Laboratory, National University of Defense Technology, Changsha 410073, P.R. China. E-mail: guodeke@gmail.com.%\IEEEcompsocthanksitem J. Xu is with the School of Computer, Electronics and Information, Guangxi University, Nanning 530004, P.R. China. E-mail: xujia@gxu.edu.cn.
 }
 }
 \IEEEcompsoctitleabstractindextext{%
 \begin{abstract}
-Asynchronous and distributed Stochastic Gradient Descent (SGD) with the variance reduction technique such as Stochastic Variance Reduction Gradient (SVRG) has been proved powerful to train various machine learning tasks. However, it cannot support the distributed machine learning algorithms directly because of excessive volume of training data in the era of Big Data. Although conventional work such as PetuumSGD performs well for distributed machine learning tasks, they focus on the optimization on communication protocols for iterative convergence algorithms which do not exploit the potential benefit of a specific machine learning algorithm. We analyze both SVRG and the asynchronous communication protocol in PetuumSGD, and propose a distributed implementation of SVRG by combining both of them together. Furthermore, we optimize our distributed SVRG with many tricks including an accelerated factor for the constant learning rate and adaptive sampling strategy to exploit the benefits SVRG. Extensive empirical study verifies that our distributed SVRG  performs better on accelerating iterative convergence machine learning algorithms than pioneering work such as PetuumSGD. 
+Stochastic Gradient Descent (SGD)  with variance reduction techniques have been proved powerful to train parameters of various machine learning models. However, they cannot support the distributed systems trivially due to the intrinsic design.  Although conventional studies such as PetuumSGD perform well for distributed machine learning tasks, they almost focus on the optimization of the communication protocol, which do not exploit the potential benefits of a specific machine learning algorithm. We analyze both the variance reduction technique and the asynchronous communication protocol in PetuumSGD, and propose a distributed version of variance reduced SGD named \emph{DisSVRG}. Specifically, DisSVRG adopts the variance reduction technique to update the parameters of a model, and then shares those new learned parameters across machines in a cluster by using asynchronous communication protocol. Besides, we accelerate DisSVRG by using the learning rate with an accelerated factor. An adaptive sampling strategy is proposed in DisSVRG, which reduces much wait time during the iterations, and speed up the convergence of DisSVRG. Extensive empirical study verifies that DisSVRG  converges faster than the state-of-the-art variant of SGD, and gains almost linear speedup in a cluster. 
 \end{abstract}
 
 \begin{IEEEkeywords}
-Stochastic gradient descent, Staleness synchronous protocol, Distributed machine learning algorithms.
+Stochastic gradient descent, Variance reduction, Asynchronous communication protocol, Distributed machine learning algorithms.
 \end{IEEEkeywords}}
 
 \maketitle
@@ -62,103 +62,88 @@ Stochastic gradient descent, Staleness synchronous protocol, Distributed machine
 \section{Introduction}
 \label{introduction}
 
+Machine learning based applications such as image recognization \cite{Coates2011An}, speech recognization \cite{dahl2012context} and text processing \cite{collobert2008unified} have got a lot proliferation in the era of Big Data. Those underlying machine learning models are usually complex and big with a large number of parameters which can be trained or learned from a huge size of training data. For example, it is possible to train a large scale deep network which consists of millions and even billions of parameters by feeding it decades of terabytes training data. Furthermore, it is noting that most of the machine learning algorithms are iterative convergent, which means those algorithms need many rounds of iterative calculations to update the parameters in their models. Considering the complex model, the huge size of the training data and the massive computation, an efficient training method is vitally important for a large scale learning task.
 
+Many machine learning algorithms can be described the optimization problem like (\ref{equa_loss_minimization}).
+\begin{equation}
+\label{equa_loss_minimization}
+\min F(\omega),~~~~~F(\omega)=\frac{1}{n}\sum\limits_{i=1}^n f_i(\omega)\\
+\end{equation}, and the update rule is:
+\begin{equation}
+\omega_t=\left\{ \begin{array}{ll}
+\omega_{t-1}-\nabla F(\omega_{t-1})$ \verb|\\|$the ~ gradient ~descent\\
+\omega_{t-1}-\nabla f_i(\omega_{t-1})$ \verb|\\|$the ~stochastic ~gradient~ descent\\
+\end{array} \right.
+\end{equation}. Here, $\nabla$ stands for the derivation operation. $F(\omega)$ is generally called the loss function. $\omega$ represents the parameters in a model, that is, the parameters needed to be updated during the iterations. $n$ means the size of training data. $t$ represents it is the $t$th iteration.  Such the loss function $F(\omega)$ can be minimized by updating the parameters iteratively, which is called the learning process. Conventionally, the gradient descent method is used to compute the global average gradient, i.e., $\nabla F(\omega_{t-1})$, and then uses it to update the parameters during an iteration. Since$\nabla F(\omega_{t-1})$ needs $n$ derivations, which are time-consuming, the gradient descent method is not practical for a large scale learning task.  An alternative approach  is Stochastic  Gradient Descent (SGD) and its variants. SGD randomly samples an instance from the training data, and then use it to compute the local gradient, i.e., $\nabla f_i(\omega_{t-1})$, instead of the global average gradient.   The parameters are thus updated by using the local gradient. Since $\nabla f_i(\omega_{t-1})$ merely needs one derivation for the local gradient during an iteration,  it is efficient for the large scale learning tasks.  However, since $f_i$ is randomly sampled, the variance exists between the local gradient $\nabla f_i(\omega_{t-1})$ and the global average gradient $\nabla F(\omega_{t-1})$, which slows the convergence of the loss function i.e., $F(\omega)$, of a machine learning algorithm.  Especially, when the parameters are close to the optimal state, it is difficult to decrease the loss function due to the variance. Conventionally, the variance is reduced by using a decaying learning rate to update the parameters. That is,  the value of the learning rate is decreased when the iteration proceeds. Although the variance can be reduced by the decaying learning rate, the small learning rate unavoidably  leads to the slow convergence.  
 
+Recently, the SGD and its variants have been widely used to train the parameters of a model in distributed memory systems \cite{Dean:2012wx, Li:2014tt, Xing:2015ib}. Those versions of SGD generally train and update parameters in a parameter-server system by using a cluster. The machines in the parameter-server system are categorised into servers and workers. The underlying calculations of the gradients are conducted by workers. Such those updates will be then pushed to servers, and be aggregated on servers for updating the global parameters. Finally, those new learned global parameters will be shared with workers. Since there exists much communication between workers and servers, all the distributed versions of SGD like PetuumSGD focus on the optimization of communication \cite{Xing:2015ib}.  In specific, PetuumSGD has proposed the asynchronous communication protocol denoted by Staleness Synchronous Protocol (SSP) to conduct communication across machines. SSP  accelerates PetuumSGD than the Bulk Synchronous Protocol (BSP) on Hadoop or Spark significantly. Since SSP is designed for the general iterative convergent machine learning algorithms, it does not exploit the potential benefits of SGD to accelerate the iterative calculations. For example, PetuumSGD updates the parameters by using a decaying learning rate. The learning rate in PetuumSGD in the current iteration denoted by $\eta$ will become $0.95\eta$ in the next iteration. When the parameters are close to the optimal state, the loss function is difficult to be decreased due to the extremely small learning rate. In a nutshell,   even though PetuumSGD adopts SSP  to optimize the communication between workers and servers, the decay learning rate slows the convergence. 
+
+Meanwhile, a new technique of the variance reduction is proposed to speed up the convergence of SGD \cite{Johnson:9MAvkbgy, Zhao:SZfxEHHg, Reddi:2015vj}. Such the variance reduction technique reduces the variance of SGD, and keeps SGD converging at a constant rate.   However, those versions of SGD are designed to be used in one machine instead of a cluster. When the amount of parameters or the size of training data is extremely huge so that they cannot be stored in a machine, the underlying variance reduction technique will not work. For instance, a deep network may have billions or even trillions of parameters, which cannot be stored in a machine. Therefore, such versions of SGD are difficult to train a large scale learning task, and handle a huge size of training data. 
+
+In this paper, We design a distributed and asynchronous version of variance reduced SGD denoted by DisSVRG for large scale machine learning tasks. It is noting that DisSVRG adopts the asynchronous communication protocol, i.e., Staleness Synchronous Protocol (SSP). In order to obtain a fast convergence, DisSVRG is accelerated by using a learning rate with an accelerated factor. It is unavoidable for the fast workers to spend much time on waiting the slow workers when performing iterative calculations  in a cluster, which is called the "straggler problem". The straggler problem wastes much time for the fasters workers, thus leads to the slow convergence of a machine learning algorithm. In order to reduce the wait time, we propose an adaptive sampling strategy to alleviate the straggler problem. Specifically, we dynamically adjust the random sampling strategy during the iterations. When the worker is faster than other workers, it will  sample more instances for the next iteration, which will take the faster worker more time to compute the local gradient.   Thus, the slow workers have chance to catch up the faster works, and  the wait time is reduced significantly. Finally, we conduct empirical studies on the HPC cluster named \emph{Tianhe} on the National Supercomputing Center in Changsha. The performance evaluation verifies that DisSVRG outperforms the state-of-the-art version of SGD, and obtains approximately linear speedup in the cluster.
+
+The rest of this paper is organized as follows. Section \ref{related_work} outlines the related work of our work. Section \ref{overview} presents the assumptions and the overview of DisSVRG. Section \ref{implementation} illustrates the details of DisSVRG. Section \ref{optimization_sgd} highlights the  optimization of DisSVRG. Section \ref{discussion} discusses the major difference between our work and the previous studies. Section \ref{performance_evaluation} shows the performance evaluation. Section \ref{conclusion} concludes the paper.
 
 
 
 \section{Related work}
 \label{related_work}
 
+%\subsection{Asynchronous distributed stochastic gradient descent}
+With the proliferation of data, a complex and big model can be learned by feeding it a huge size of training data. An approach for such a large scale learning is to use a cluster to train the parameters of the underlying model \cite{Dean:2012wx, Li:2014tt, Xing:2015ib}. Dean et al. propose a version of asynchronous and distributed SGD denoted by \emph{DownpourSGD} in a parameter-server system. DownpourSGD uses fully asynchronous communication protocol to conduct communication across machines, which cannot guarantee the convergence. To increase the robustness of DownpourSGD, the Adagrad adaptive learning rate procedure is adopted \cite{Cavalcante:2009il}. However, the adopted learning rate is decaying with the iterations, and thus leads to the slow convergence. Besides, Li et al. and Xing et al. propose an implementation of the parameter-server system respectively.  The similar asynchronous communication protocol denoted by SSP is adopted in both of their systems to share the updates of the parameters across machines. SSP has been proved powerful in both theory and practice.  However, SGD in \cite{Li:2014tt} uses a constant learning rate without variance reduction technique, leading to slow convergence caused by the variance. SGD in \cite{Xing:2015ib}, i.e.,PetuumSGD, adopts a decaying learning rate to reduce the variance, giving rise to slow convergence when the learning rate becomes small. Our version of the asynchronous and distributed SGD, i.e., DisSVRG, adopts SSP to implement the communication across machines, and uses the variance reduction technique  to reduce variance as well. 
+ 
+%\subsection{Asynchronous parallel stochastic gradient descent with variance reduction technique}
+The latest variance reduced SGD denoted by \emph{SVRG} is adopted in \cite{Johnson:9MAvkbgy}, which is  effective to reduce the variance of SGD. However, SVRG is a serial version, and designed to be run on a single machine. Thus, it is not suitable for a large scale learning task. Asynchronous and parallel versions of SVRG partially solve this problem \cite{Zhao:SZfxEHHg, Reddi:2015vj, Mania:2015wa, lian2015asynchronous}. Such versions SVRG uses the lock-free method to update the parameters in parallel for multiple learning threads in a machine. However, the design of such work targets at a multicore system on a single machine. When the size of training data or the number of parameters in the model is huge so that they can not be stored in one machine, SVRG and those variants do not work immediately. Our proposed variance reduced SGD is designed for a cluster which is effective to perform the large scale learning tasks. 
 
-
-
-\subsection{Asynchronous distributed stochastic gradient descent}
-
-
-
-
-
-\section{Preliminaries and Overview}
+\section{Assumptions and Overview}
 \label{overview}
-Many machine learning algorithms can be described by using 
-
-\begin{equation}
-\label{equa_loss_minimization}
-\begin{split}
- & \min F(w) \\
- & F(w)=\frac{1}{n}\sum\limits_{i=1}^n f_i(w)\\
-\end{split}
-\end{equation}.
-
-Here, $n$ means the size of training data, and $w$ represents the parameters of a machine learning model, that is, the parameters needed to be updated during the iterations. Conventionally, each $f_i(w)$ is a $L$-smooth function so that $\exists$ a non-negative $L$, and $\forall$ $a$ and $b$, the following inequality holds.
+\subsection{Assumptions}
+Conventionally, each $f_i(\omega)$ in the optimization problem \ref{equa_loss_minimization} is a $L$-smooth function. That is, $\exists$ a non-negative $L$, and $\forall$ $a$ and $b$, the following inequality holds.
 
 \begin{equation}
 \label{equa_l_smooth} 
 f_i(a)\le f_i(b)+\nabla f_i(b)^\mathrm{T} (a-b)+\frac{L}{2}\parallel a-b\parallel^2
- \end{equation}.
- 
-The inequality can be described equivalently as follows.
-
-\begin{equation}
-\label{equa_l_smooth2} 
-\parallel f_i(a)-f_i(b)\parallel^2\le L \parallel a-b\parallel^2
  \end{equation}
- or $\exists$ a non-negative $C$, the following inequality holds.
  
- \begin{equation}
-\label{equa_l_smooth3} 
-\parallel \nabla f_i(a)-\nabla f_i(b)\parallel\le C
- \end{equation}
-
-
-Besides, the loss function $F(w)$ is $\gamma$-strongly convex, which means that $\exists$ a non-negative $\gamma$, and $\forall$ $a$ and $b$, the following inequality holds.
+Besides, the loss function $F(\omega)$  in the optimization problem \ref{equa_loss_minimization} is $\gamma$-strongly convex, which means that $\exists$ a non-negative $\gamma$, and $\forall$ $a$ and $b$, the following inequality holds.
 
 \begin{equation}
 \label{equa_gamma_convex} 
 F(a)\ge F(b)+\nabla F(b)^\mathrm{T} (a-b)+\frac{\gamma}{2}\parallel a-b\parallel^2
-\end{equation}.
+\end{equation}
 
-The inequality can be presented equivalently as follows.
+It is noting that these assumptions are not tight, and many machine learning algorithms are under these assumptions including regression and classification. These assumptions will be exploited to optimize our version of SGD in Section \ref{optimization_sgd}. 
 
-\begin{equation}
-\label{equa_gamma_convex} 
-\parallel F(a)-F(b)\parallel \ge \gamma \parallel a-b\parallel
-\end{equation}.
-
-Many machine learning algorithms can be represented by this abstraction including regression and classification and so forth. 
-
- 
-Inspired by the variance reduction in \cite{Johnson:9MAvkbgy}, we present the overview of our asynchronous and distributed SGD in Algorithm \ref{algorithm_dis_svrg}. Our asynchronous and distributed SGD consists of three ingredients: epochs of iterations (the outer for loop at Line 2), random update strategy of parameters (the inner for loop at Line 6) and update rule of parameters (Line 8 and 9). We abstract all the threads running on machines of a cluster as two ingredients: the servers and the trainers. The epochs of iterations is conducted by the servers which adopts asynchronous communication protocol, i.e., SSP to proceed the iterations for all trainers. The random update strategy of parameters is conducted by the trainers which randomly pick one of $n$ candidate training samples, compute the variance reduced gradient, and then update such gradient to parameters. 
+\subsection{Overview}
+Our distributed and asynchronous SGD denoted by DisSVRG is presented  in Algorithm \ref{algorithm_dis_svrg}. DisSVRG consists of three ingredients: the epochs of iterations (the outer \emph{for} loop at Line 2), the random sampling strategy of the training data (the inner \emph{for} loop at Line 6) and the update rule of the parameters (Lines 8-9). DisSVRG is started by the servers, and will be informed to all the workers by message passing. Since a worker has received the message from a server, it pulls a copy of the global parameters from a server, and  begins conducting the calculations during the epoch. The random sampling strategy is conducted by the workers. When a worker randomly samples an instance from the training data, it computes the variance reduced gradient (Line 8), and updates the local parameters with the local gradient (Line 9). When the local parameters have been updated, the new learned parameters will be sent to a server. The inter-machine communication is conducted by the asynchronous communication protocol, i.e., SSP. The server receives these learned parameters  and aggregates them. The aggregated parameters are the latest global parameters which will be sent to workers for the next iteration. The details of communication across machines and aggregation of parameters will be demonstrated in Section \ref{implementation}. 
 
 \begin{algorithm}[t]
     \caption{DisSVRG}
     \label{algorithm_dis_svrg}
     \begin{algorithmic}[1]
-        \State Initialize $\tilde{\omega}^0$
-        \For {$s=1,2,...$} \% Asynchronous learning parameters for all trainers
+        \State Initialize $\tilde{\omega}^0$\%Pull the global parameters by all trainers from the servers.
+        \For {$s=1,2,...$} \% Asynchronously update the parameters by all trainers.
             \State $\tilde{\omega}=\tilde{\omega}^{s-1}$
-            \State $\mu=\frac{1}{n}\sum\limits_{i=1}^n\nabla f_i(w_i)$
+            \State $\mu=\frac{1}{n}\sum\limits_{i=1}^n\nabla f_i(\omega_i)$
             \State $\omega_0=\tilde{\omega}$
-            \For {$t=1,2,...m$} \% Variance reduction technique used in each trainer 
-                \State randomly pick $i_t\in\{0,1,2,...,m\}$
-                \State $v_t=\nabla f_{i_t}(w_{t-1})-\nabla f_{i_t}(\tilde{\omega})+\mu$ \% stochastic variance  reduced gradient
-                \State $w_t=w_{t-1}-\eta v_t$
+            \For {$t=1,2,...m$} 
+                \State randomly sample $i_t\in\{0,1,2,...,m\}$
+                \State $v_t=\nabla f_{i_t}(\omega_{t-1})-\nabla f_{i_t}(\tilde{\omega})+\mu$ \%Variance reduced gradient.
+                \State $\omega_t=\omega_{t-1}-\eta v_t$\%Update the parameters with variance reduction gradient.
            \EndFor
-           \State $\tilde{w}_s=w_m$
+           \State $\tilde{\omega}_s=\omega_m$\%Push the new learned parameters to the servers, and aggregate them with the global parameters. 
        \EndFor
     \end{algorithmic}
 \end{algorithm}
 
-A global state of parameters is maintained by all servers. When the iteration begins, all trainers pull the global parameters from one of servers. Then all the trainers start to conduct the machine learning tasks asynchronously. To be specific, each a trainer computes the variance reduced gradients and update its local copy of global parameters.   When a trainer finish to update its local parameters, it will push its local copy of parameters to one of servers. Since the runtime environment of machines are various, the computation time of variance reduced gradient  is not same. However, the fast trainers will continue to proceed the iterations, and  not wait the slow ones. On the other hand, the asynchronous SGD may not converge if all the trainers update parameters in a fully asynchronous way. Here, we set a delay bounded, i.e., $\tau$. The delay $\tau$ is used to synchronize all the trainers. Specifically, when the fastest trainer finishes the $t$th iteration, and the slowest trainer does not finish the $(t-\tau)$th iteration,  it will be forced to stop and wait the slowest trainer. 
+%
 
 \section{System implementation}
 \label{implementation}
-DisSVRG is implemented by the servers and trainers where the servers maintain the local state of parameters, and the trainers compute the updates of parameters. The servers receive the updates of parameters from trainers, and then aggregate these updates into the local parameters. Each a trainer pushes a copy of a global parameters before it starts to conduct machine learning tasks. When a trainer finishes the updates of parameters during an epoch, it will pull the latest local parameters to one of servers. If a trainer has finished the $t$th epochs, and all the trainers have finished the $t-\tau$th epochs, then this trainer will pull the aggregated parameters and starts to another epoch, or it will have to wait. To be specific, the details of DisSVRG are presented as follows.
+DisSVRG is designed for the distributed memory system where the machines can be categorized into workers and servers. Every worker caches a copy of the parameters which is called the \emph{local parameters}; while all the servers maintains one copy of the parameters which is called the \emph{global parameters}. The global parameters will be pulled by a worker and be used as the initial parameters for an iteration. Meanwhile, such the initial parameters will replace the stale local parameters on the worker and become its new local parameters.
 
-\textbf{Server:} 
-
-
+\textbf{Server:}    The servers control the iterations by using the asynchronous communication protocol, i.e., SSP.  Since the runtime environment of machines in a cluster varies a lot, the cost time of an epoch for different workers  is not same. Therefore, there are fast and slow workers which conduct an epoch fast and slow respectively.   It is noting that DisSVRG may not converge if all the workers update parameters in a fully asynchronous way. Therefore, we set a delay bound, i.e., $\tau$. The delay $\tau$ is used to synchronize all the workers. For instance, when the fastest worker finishes the $t$th iteration, and the slowest worker does not finish the $(t-\tau)$th iteration, the fastest worker will be forced to stop and wait the slowest one. In specific, the fastest worker can not  pull a copy of the global parameters from the servers, and thus has to wait for the slowest work. Until the slowest worker finishes the $(t-\tau)$th iteration, the fastest worker will re-start to conduct the iterations. When a server receives the new learned parameters from a worker, it will aggregated them with the global parameters on the server. After that, the latest parameters on the server will be pulled by the worker for the next iteration.
+The details are illustrated in Algorithm \ref{algorithm_dis_svrg_server}.
 
 \begin{algorithm}[t]
     \caption{Server}
@@ -167,113 +152,200 @@ DisSVRG is implemented by the servers and trainers where the servers maintain th
         \State Initialize $\tilde{\omega}^0$
         \While {true}
             \If {receive a pull request from the trainer $p$}
-                \State $e_p=p.epoch$
-                \If {other trainers have finished $e_p-\tau$th epoch}
+               \State $e_p=p.epoch$
+                \If {all the trainers have finished $(e_p-\tau)$th epoch}
                     \State send a copy of the global parameters.
                 \EndIf
             \EndIf
             \If {receive a push request from the trainer $p$}
-                \State receive the parameters from the trainer $p$, and aggregate them with the local parameters.
+                \State receive the new learned parameters from the trainer $p$, and aggregate them with the global parameters on the server.
             \EndIf
         \EndWhile
     \end{algorithmic}
 \end{algorithm}
 
-
-
-
-\textbf{Trainer:}
-
-
-
+\textbf{Worker:} Workers in a cluster conduct machine learning tasks in asynchronous way. They pull the parameters from the servers by message passing. If a  copy of the global parameters is pulled to the workers, those workers begin iterative calculations. During an epoch, workers first randomly pick an instance from the training data, then use the instance to compute the gradient.  All the workers are independent with peers when conducting iterative calculations. When an epoch is finished, a worker has learned the new parameters, and will send those new learned parameters to a server. It is the servers that control when to synchronize among the workers. 
  
 \begin{algorithm}[t]
     \caption{Trainer}
     \label{algorithm_dis_svrg_trainer}
     \begin{algorithmic}[1]
-        \State $e_p=0.$
         \While{true}
             \State send a pull request to a server
             \While {true}
-                \If {receive a copy of global parameters from the server}
-                    \State $e_p=e_p+1.$
+                \If {receive a copy of the global parameters from the server.}
+                    \State cache it as the new local parameters, i.e., $\tilde{\omega}$.
+                    \State $\mu=\frac{1}{n}\sum\limits_{i=1}^n\nabla f_i(\tilde{\omega})$
                     \For {$t=0,1,2,..., m$}
-                       \State random pick a non-negative number $i$ with $i\in\{0,1,.2,...,n\}$
-	              \State $v_t=\nabla f_{i_t}(w_{t-1})-\nabla f_{i_t}(\tilde{\omega})+\mu$ 
-	              \State $w_t=w_{t-1}-\eta v_t$ 
+                       \State randomly sample a non-negative number $i$ with $i\in\{0,1, 2,...,n\}$
+	              \State $v_t=\nabla f_{i_t}(\omega_{t-1})-\nabla f_{i_t}(\tilde{\omega})+\mu$ 
+	              \State $\omega_t=\omega_{t-1}-\eta v_t$ 
                     \EndFor
-                    \State send the latest parameter $w_m$ to a server.
-                 \EndIf 
+                    \State send the new learned parameter $\omega_m$ to a server.
+               \EndIf 
         \EndWhile
       \EndWhile
     \end{algorithmic}
 \end{algorithm}
 
+\textbf{Aggregation:} When the workers push their new learned parameters to the servers, those parameters will be aggregated with the global parameters on the servers. The average between the new learned parameters and the global parameters will be identified as the latest global parameters, and will wait to be pushed to all the workers for the next iteration.
 
 
+\textbf{Update rule:} As illustrated in Algorithm \ref{algorithm_dis_svrg_trainer}, DisSVRG is significantly different from the standard SGD because of the variance reduction technique. In the standard SGD, the update rule is shown as follows.
+\begin{equation}
+\label{standard_sgd}
+v_t=\nabla f_{i_t}(\omega_{t-1})
+\end{equation}
 
-
-
+$v_t$ in the standard SGD is not the global gradient, which leads to variance, and slows the convergence of the loss function unavoidably. Instead, the variance reduction technique is used in DisSVRG effectively reduce the variance \cite{Johnson:9MAvkbgy}. Considering the $i$th round of the iterations, since $i_t$ is randomly picked, it holds that 
+\begin{equation}
+\mathbb{E}\nabla f_{i_t}(\omega_{t-1})=\frac{1}{n}\nabla F(\omega_{t-1})
+\end{equation}, and
+\begin{equation}
+\mathbb{E}(-\nabla f_{i_t}(\tilde{\omega})+\mu)=-\frac{1}{n} \nabla F(\tilde{\omega})+\mathbb{E}(\mu)=0
+\end{equation}. Therefore, 
+\begin{equation}
+\mathbb{E}(\nabla f_{i_t}(\omega_{t-1})-\nabla f_{i_t}(\tilde{\omega})+\mu)=\mathbb{E}(\nabla f_{i_t}(\omega_{t-1}))=\frac{1}{n}\nabla F(\omega_{t-1})
+\end{equation}. It is obvious that the variance of DisSVRG is reduced as expected. Unlike PetuumSGD and DownpourSGD, DisSVRG can converge fast without decaying the learning rate during the iterations. Benefiting from the variance reduction technique, DisSVRG  can converge at a constant rate.
 
 \section{Optimization of asynchronous and distributed SGD}
 \label{optimization_sgd}
-In this section, we present two optimization tricks which can be used to accelerate DisSVRG in a cluster. 
+\subsection{Learning rate with an accelerated factor}
+Generally, variance reduction technique accelerates machine learning algorithms by using a constant learning rate. Even though the constant learning rate performs well for $L$-smooth and $\gamma$-strongly convex objection function, some intrinsic properties can be exploited to accelerate the convergence of the machine learning algorithms. 
 
-\subsection{Learning rate with accelerated factor}
-Generally, variance reduction technique accelerates machine learning algorithms by using a constant learning rate. Even though the constant learning rate performs well for $L$-smooth and $\gamma$-strongly convex objection function, some inner properties can be exploited to accelerate the convergence of the machine learning algorithms. 
+We introduce an accelerated factor $\sigma$ with $\sigma=\parallel \nabla f_i(\omega)\parallel$ to the learning rate of DisSVRG. That is,
+\begin{equation}
+\eta=\eta_0+\sigma,~~~~~~\sigma=\parallel \nabla f_i(\omega)\parallel
+\end{equation}.
+The learning rate of DisSVRG contains two ingredients: the constant and the accelerated factor. The constant part of the learning rate get the parameters out of the local optimal state; while the accelerated factor speedup the convergence of DisSGD. This setting of the accelerated factor is reasonable. First, the accelerated factor will become large when the parameters are far from the optimal state. If so, DisSVRG will converge fast benefiting from the large learning rate. Second, the accelerated factor will not become so large that DisSVRG do not converge. Considering that the convex function $f_i$ in the machine learning model is $L$-smooth, $\nabla f_i$ will not be changed out of  a range for an iteration. That is, $\parallel\nabla f_i\parallel<C$. Here, $C$ is a non-negative constant. Third, when the parameters are close to the global optimal state, the accelerated factor $\delta$ will become close to zero. DisSVRG thus almost converges to the global optimal state at a constant just like the original design in \cite{Johnson:9MAvkbgy}.
 
-Based on the inequality \ref{equa_l_smooth3}, when $b$ is valued the optimal weight, i.e., $w^\ast$, $\forall$ $w$, it holds that $\parallel\nabla f_i(w)\parallel \le C$. That is, when the parameters are updated, the absolute value of the gradient is bounded by a constant. Besides, the gradient of parameters decreases when such parameters approach to the optimal state. Especially, when the parameters are close to  the optimal state, their gradient reaches zero approximately. Therefore, we introduce an accelerated factor $\sigma$ with $\sigma=\parallel \nabla f_i(w)\parallel$. The learning rate of our SGD contains two ingredients: the constant and the accelerated factor. The constant part of DisSGD prevalents  it to get struck at the local optimal state; while the accelerated factor makes DisSGD converge at a more than constant rate. Furthermore, since the gradient of  each function $f_i(w)$ has an upper bound, the accelerated factor do not become very large and lead to the divergence of the objection. 
-
-As illustrated in Fig. \ref{figure_evaluation_accelerated_factor}, we deploy such an accelerated factor in linear regression tasks. Here, the evaluation test is conducted on a machine instead of a cluster. The dataset is \emph{YearPredictMSD} which is the biggest dataset we can find to conduct linear regression tasks. The settings of this evaluation test  is and more evaluations are presented in Section \label{performance_evaluation}. 
-The solid lines represent the machine learning task with the basic learning rate $\eta \mathrm{=}0.001$; while the dotted lines stands for the machine learning task with the basic learning rate $\eta \mathrm{=}0.01$. Additionally, the blue lines means that the machine learning algorithm is trained by using a constant learning rate, but the red lines means that such machine learning algorithm is trained by using an incremental learning rate. The incremental learning rate consists of a basic learning rate and a accelerated factor. We can get two important observations from Fig. \ref{figure_evaluation_accelerated_factor}. First, the learning rate with an accelerated factor makes the machine learning algorithm converges faster than the learning rate without such a accelerated factor. Second, such benefits due to the accelerated factor becomes large when the basic learning rate increases. Shortly,  the accelerated factor gives rise to obvious benefits for the machine learning algorithms.
+As illustrated in Fig. \ref{figure_evaluation_accelerated_factor}, we use such the accelerated factor to conduct the linear regression tasks. Here, the evaluation test is conducted on a machine instead of a cluster. The dataset is \emph{YearPredictMSD} which is the largest dataset we can find to conduct linear regression tasks. Other settings of the evaluation are presented in Section \label{performance_evaluation}.  We can get two important observations from Fig. \ref{figure_evaluation_accelerated_factor}. First, the learning rate with an accelerated factor makes the underlying machine learning algorithm converges faster than the constant learning rate without such the accelerated factor. Second, the benefits become significant with a small basic learning rate. Shortly,  the accelerated factor gives rise to obvious benefits to accelerate the convergence of a machine learning algorithm.
 
 \begin{figure}
 \centering
 \subfigure{\includegraphics[width=0.86\columnwidth]{figures/evaluation_accelerated_factor}}
-\caption{DisSVRG with the accelerated factor converges faster than DisSVRG.}
+\caption{The learning rate with the accelerated factor makes DisSVRG converge fast significantly.}
 \label{figure_evaluation_accelerated_factor}
 \end{figure}
-
-
-
-\subsection{Adaptive strategy of the random updates}
-
-Since DisSVRG needs the strategy of random updates in its inner loop, it is important to identify how many random updates in an epoch is appropriate to achieve a good tradeoff between time and accuracy.  As illustrated in the inner loop of Algorithm \ref{algorithm_dis_svrg}, $m$ represents the number of random updates for an epoch. First, $m$ cannot be given a large number such as $O(n)$. Here, $n$ means the size of the training data.  In order to maintain a satisfied accuracy, DisSVRG have to conduct the inner loop serval times, which consumes much time since the training data becomes extremely huge such as millions or billions of samples. Especially, we can get billions or trillions of samples from sensors in the world or Internet, a large $m$ like $O(n)$ makes the runtime of DisSVRG unacceptable.  On the other hand, $m$ cannot be set a small value straightly.    To gain a high accuracy of the objection function, a small $m$ leads to many epochs of DisSVRG. However, an average gradient is needed for  an epoch, which leads to $n$ deprivation operations. Therefore, a small $m$ costs too much time due to the deprivation operations. As illustrated in Fig. \ref{figure_evaluation_random_strategy}, we conduct an evaluation test on a  machine by varying the value of $m$. Here, the dataset is still \emph{YearPredictMSD}, and the learning rate, i.e., $\theta$ is set to a constant with $\theta=10^{-5}$. It is obvious that a large $m$ brings a fast convergence of the objective function because such a large value of $m$ gets rid of frequent computation of the average gradient.
-
-Additionally, a cluster such as EC2 is often heterogenous so that machines in the clusters perform differently due to the diversity of the hardware. Intuitively, some machines in the cluster conduct DisSVRG  fast; while others perform DisSVRG slowly.  Therefore, it is suitable and practical that the number of inner loops of DisSVRG, i.e., $m$, should be flexible to be adjusted for each a machine. In other words, DisSVRG should allow that $m$ on different machines can be set a different value. Intuitively, the machines which run fast should have a larger $m$ than the machines which run slow. Although the staleness synchronous protocol, i.e., SSP, allows a delay bound for such those machines which runs slow, those machines running fast have to wait the machines running slow until the delay is achieved.  This is usually called the ''the straggler problem'.  
-
-We adopt an adaptive strategy of the random updates which dynamically adjust $m$ in order to reduce the waiting time caused by the straggler problem. When an epoch, e.g., $t$, of DisSVRG is completed, the updated parameters on the local machine will be pushed to a server. If the delay bound is denoted by $\tau$, the server will check the epochs of other machines. If there exists at least one machine which has not finished the $t-\frac{\tau}{2}$ epoch, then the fast machine increases its number of the inner loop, i.e., $m$, to $m+\delta$. Here, $\delta$ is a constant non-negative integer. By using this adaptive strategy, the fast machines will spend more time on computing the updates of parameters than the slow machines, which not only reduces the waiting time caused by the straggler problem, but also improves the convergency of DisSVRG. 
-
-
-\begin{figure}
+\begin{figure*}
 \centering
-\subfigure{\includegraphics[width=0.86\columnwidth]{figures/evaluation_random_strategy}}
-\caption{A large $m$ leads to a fast convergence for DisSVRG.}
+\subfigure{\includegraphics[width=0.86\columnwidth]{figures/evaluation_random_strategy}\label{figure_evaluation_random_strategy_accelerated_factor}}
+\subfigure{\includegraphics[width=0.86\columnwidth]{figures/evaluation_random_strategy_wait_time}\label{figure_evaluation_random_strategy_wait_time}}
+\caption{A large $m$ leads to a fast convergence for DisSVRG, and reduces much wait time during iterations.}
 \label{figure_evaluation_random_strategy}
-\end{figure}
+\end{figure*}
+
+\subsection{Adaptive sampling strategy}
+
+Since DisSVRG needs the sampling strategy to update the parameters during an epoch, it is important to identify how many random updates in an epoch is appropriate.  As illustrated in Algorithm \ref{algorithm_dis_svrg}, $m$ represents the number of updates for an epoch. First, $m$ cannot be given an extremely large number, which tasks much time to update the local parameters during an epoch on a worker.  Second, $m$ cannot be set a small value straightly. If so, DisSVRG has to conduct many epochs to reduce the value of the loss function. Considering that the average gradient of the loss function is needed to conduct an epoch, a small $m$ means much computation of the average gradients, which is time-consuming. 
+%Therefore, it is important to find a good sampling strategy by identifying an appropriate $m$. 
+
+Additionally, it is noting that the machines in a cluster perform differently due to the diversity of the runtime environment or the hardware in the heterogenous cluster.  Although the asynchronous communication protocol, i.e., SSP, allows a delay bound to relax the synchronization among the machines, those fast machines have to wait the slow machines when the delay is achieved. Such wait time impairs the convergence of DisSVRG. An approach to reduce the underlying wait time is to adjust the sampling strategy dynamically.  Intuitively, the fast machines in the cluster should sample more instances during an epoch than the slow machines. That is, $m$ in the fast machines should be larger than that in the slow machines. 
+
+We adopt an adaptive dynamic sampling strategy which dynamically adjust $m$. When an epoch is completed, the new learned local parameters will be pushed to a server. The server will check the epochs of the worker. If the worker is too fast, it needs to wait other slow peers.  The fast workers will adjust  $m$ to be a large value, i.e., $m+\delta$. Here, $\delta$ is a non-negative integer, and is set $\delta=0.05m$ in DisSVRG. By using this adaptive strategy, the fast machines will sample more instances during an epoch, thus spend more time on computing the updates of parameters than the slow machines. The slow workers have chance to catch up the fast workers. Therefore, the wait time is reduced as a result. This adaptive sampling strategy has many benefits. The most important benefit is that the fast machines reduce the wait time, and use it  to converge DisSVRG. We conduct an evaluation test on a  machine by varying the value of $m$. Here, the dataset is still \emph{YearPredictMSD}, and the learning rate, i.e., $\theta$ is set to a constant with $\theta=10^{-5}$. As illustrated in Fig. \ref{figure_evaluation_random_strategy_accelerated_factor},  it is obvious that a large $m$ brings a fast convergence of the objective function. Therefore, a large $m$ benefits to decrease the value of the loss function. Additionally, the wait time is compared in a cluster which consists of $5$ machines.   As shown in Fig. \ref{figure_evaluation_random_strategy_wait_time}, the average wait time has been evaluated by varying $m$. Here, the delay is set to $0$.  It is obvious that the adaptive sampling strategy  decreases the average wait time during iterations, and thus spend much time to accelerate the convergence of DisSVRG in reverse. 
+
 
 
 
 
 \section{Discussion}
 \label{discussion}
-The machine learning tasks such as Deep learning are generally fed with extremely large volume of training data in the era of Big Data. However, conventional serial variants of SGD  cannot consume training data on a single machine within the available time. Although distributed variants of SGD such as PetuumSGD are designed to solve this challenge, those existing SGD versions are always presented as demos of some distributed machine learning systems like Petuum. SGD has its inner weakness such as the variance due to the random update of parameters. Such those distributed machine learning systems thus decrease the learning rate to reduce the variance, which leads to slow convergence of SGD. The main reason is that when machine learning tasks are proceeded, the learning rate will be decreased to a very small value so that every iteration bring tiny benefits to the loss function. Even though existing distributed machine learning systems have made much optimization on the communication mechanism, SGDs embedded on those systems are not exploited to accelerate machine learning tasks. 
+The machine learning tasks such as Deep learning are generally fed with extremely large volume of training data. However, conventional serial versions of SGD  cannot handle a huge training data on a single machine within the available time. Although some distributed machine learning systems such as Petuum \cite{Xing:2015ib} and DMTK\cite{Yuan:2015ka} have designed to solve this problem.  Those variants of SGD have their inner weakness, namely the variance. Such those distributed machine learning systems thus decrease the learning rate to reduce the variance, which leads to slow convergence of SGD. We do not aim to proposing another a general platform for distributed machine learning algorithms, but focus on the optimization of SGD in a distributed system. Our implementation of the distributed SGD, i.e., DisSVRG, adopts the variance reduction technique to reduce the variance. Such the variance reduction technique is the most difference between DisSVRG and PetummSGD. Although PetuumSGD  adopts a decayiny learning rate, it slows to converge the loss function. DisSVRG has been accelerated with two ingredients: the constant and the accelerated factor. The constant factor is effective to get DisSVRG out of the local optimal state, and keeps converge at a constant rate. The accelerated factor will speedup the convergence of the machine learning algorithm. Even though DisSVRG adopts the same asynchronous communication protocol with PetuumSGD, it converges faster than PetuumSGD by adopting the powerful variance technique. 
 
-We do not aim to proposing another a general platform for distributed machine learning algorithms, but focus on the optimization of SGD in a distributed system. Our implementation of distributed SGD adopts SSP as the consistency protocol which is suitable to iterative convergence machine learning algorithms. The most difference between our implementation of distributed SGD between PetummSGD is the variance technique adopted in the algorithm. PetuumSGD adopts standard SGD with the decreasing learning rate $O(\frac{1}{\sqrt{T}})$. Here, $T$ means the epochs of iterations. Variance of PetuumSGD will be decreased when the learning rate becomes small. However, our implementation of SGD has been accelerated with two ingredients: the constant factor and the accelerated factor. The constant factor makes sure that our SGD keep a constant rate to reach to the optimal value. The accelerated factor will make the machine learning algorithm converge fast. Even though our SGD adopts the same consistency protocol with PetuumSGD, our SGD trains parameters at a faster rate than PetuumSGD by using a powerful variance technique. 
+DisSVRG is different from SVRG with at least three aspects. First, we extend the serial SVRG to an asynchronous and distributed version by using the asynchronous consistency protocol, i.e., SSP. Second, comparing with the constant learning rate in SVRG, the learning rate in our SGD contains an accelerated factor which exploits the potential benefits of the loss function, and makes the machine learning algorithms converge fast. Third, SVRG needs to sample $m$ instances randomly to update parameters. SVRG sets $m$ multiple times of the size of training data, which is not practical for a large volume of training data. Instead, DisSVRG adopts an adaptive sampling strategy which adjusts the value of $m$ by the runtime environment of the worker dynamically. Specifically, the fast workers will sample more instances during the next epoch than the slow peers. The slow workers thus have chance to catch up the fast workers. Thus, wait time is reduced significantly, which makes DisSVRG converge fast in the end. In a nutshell, considering the diversity of the runtime environment and the hardware in a cluster, DisSVRG is suitable to the practical scenarios. 
 
-Comparing with SVRG, our SGD is a asynchronous and distributed version. In the era of Big Data, the size of training data is extremely huge so that a single machine cannot handle all the training data. Since the service of data center is trivial to use,  it is natural to perform machine learning algorithms with a cluster, instead of an machine. Inspired by the variance reduction technique of SVRG, we implement a new distributed SGD. Our SGD is different from SVRG with at least three aspects. First, we extend the serial SVRG to an asynchronous and distributed version by using the asynchronous consistency protocol, i.e., SSP. Second, comparing with the constant learning rate in SVRG, the learning rate in our SGD contains an accelerating factor which exploits the potential benefits of the loss function and make the machine learning algorithms converge fast. Third, the variance reduction of SVRG needs at most $m$ random updates of parameters. $m$ is valued as the times of the size of training data, which is not practical for a large volume of training data. Our SGD achieve the value of $m$ by maintaining a window of the value of loss function and then analyzing them dynamically. Such an identification of $m$ is suitable to the practical scenarios because that each learning thread can have its own setting of $m$.  The reason is that the machines in the cluster may be very heterogeneous, and the learning threads are not synchronized during an epoch of iteration. The adaptive mechianism of the value of $m$ is suitable to such situations.
-
-Additionally, comparing with the SGD in \cite{Zhang:2015tp}, our SGD adopts a more natural way to implement distributed SGD with the variance reduction. SGD in \cite{Zhang:2015tp} implements $\tau$-delay bounded consistency protocol in the inner loop of SVRG; while the epochs of iterations keep fully consistency protocol, namely, BSP. Therefore, SGD in \cite{Zhang:2015tp} has at least two weakness. First, the BSP consistency protocol for the epochs of iterations is not suitable to the iterative convergence machine learning tasks. Since the straggler problem exists in the learning threads due to the variety of system runtime environment, the fast learning threads in SGD in \cite{Zhang:2015tp} have to wait the slow learning ones in an epoch. Considering that machine learning algorithms are iteratively convergent, such BSP consistency protocol wastes too much time. Second, the SGD in \cite{Zhang:2015tp} is coupled with the hardware of clusters. The reason is that SGD in \cite{Zhang:2015tp} uses $m$ learning threads to perform machine learning tasks where $m$ is the number of inner loop in an epoch. $m$ in SGD in \cite{Zhang:2015tp} is valued $O(n)$ where $n$ represents the size of training data. Considering the huge size of training data, $m$ is really large, which is not practical to a  cluster. Instead, $m$ in our SGD is identified by the adaptive and dynamical mechanism, which is flexible to adjust during the calculation of parameters.
+Additionally, comparing with the version of SGD in \cite{Zhang:2015tp} denoted by \emph{SSGD}, our SGD adopts a more natural way to implement the distributed SGD with the variance reduction. SSGD implements the $\tau$-delay bound inconsistent protocol within an epoch, but keeps fully consistent protocol among different workers. Therefore, SGD in \cite{Zhang:2015tp} has at least two weaknesses. First, the fully consistency protocol for the workers is not suitable to the iterative convergence machine learning tasks \cite{2015_dai_high_performance_ml, Li:2014uy, Dai:2013vj}. Since the straggler problem usually exists among workers due to the variety of the system runtime environment or the hardware in the heterogenous cluster, the fast workers in \cite{Zhang:2015tp} have to wait the slow workers, and start the next iteration in a synchronous way. Considering that machine learning algorithms are iterative convergent, such the fully consistency protocol wastes too much time. Second, SSGD is coupled with the hardware of clusters, which is not practical and natural. SSGD uses $m$ learning threads to perform machine learning tasks where $m$ is also the number of instances sampled in an epoch. That is, if the sampling strategy in SSGD adopts a large $m$, SSGD should be run in a cluster which can support $m$ learning threads at a same time. Meanwhile, $m$ in SSGD is set $O(n)$ where $n$ represents the size of the training data. Considering the huge size of training data, $m$ is really large in SSGD, which is not practical to a real cluster. In fact, a natural SGD should be designed to be flexible to work in different clusters by adjusting its settings. Instead, $m$ in DisSVRG is identified by the adaptive sampling mechanism, which is flexible to be adjusted in the runtime environment. This design of the sampling strategy shields the difference of a specific cluster, which is more general and natural.
 
 
 \section{Performance evaluation}
 \label{performance_evaluation}
+In this section, we evaluate the performance of DisSVRG by using a regression problem and a classification problem on two datasets.
+
+First we consider a regression problem:
+
+\begin{equation}
+\label{standard_sgd}
+\min \frac{1}{2n}\left(\frac{1}{1+e^{-\omega^\mathrm{T}x_i}}-y_i\right)^2
+\end{equation}
+Here, $n$ is the size of training data. The dataset named \emph{YearPredictMSD}\footnote{http://www.csie.ntu.edu.tw/$\sim$cjlin/libsvmtools/datasets/} is the biggest dataset on the LibSVM for the regression problem. It contains $463715$ samples, and each sample has $90$ dimensions. 
+
+Additionally, we consider a classification problem:
+
+\begin{equation}
+\label{standard_sgd}
+\min -\frac{1}{n}\sum\limits_{i=1}^n\left(y_i\log\frac{1}{1+e^{-\omega x_i}}+(1-y_i)\log(1-\frac{1}{1+e^{-\omega x_i}})\right)
+\end{equation}
+
+Similarly, $n$ is the size of training data. The datasets named \emph{dna}\footnote{ftp://largescale.ml.tu-berlin.de/largescale} is used for the evaluation tests. Every sample in the dataset has $200$ dimensions.  The number of samples in the \emph{dna} is $50,000,000$.
+
+We conduct the evaluation test on the HPC cluster of the \emph{Tianhe} supercomputer which is located in the National Supercomputing Center in Changsha.   We have a maximum of $128$ computing nodes, and each such node is equipped with two Intel Xeon X5670 CPUs  and  one Nvidia M2050 GPU. Each a CPU has $6$ cores; while GPUs are not used in the evaluation test.  $m$  is set $1000$. The learning rate, i.e., $\eta$ is set $10^{-6}$.
+For the fairness of the evaluation test, we use the third-party open source distributed machine learning system denoted by DMTK \cite{Yuan:2015ka} to conduct  the performance evaluation. All the algorithms which are used to be compared are implemented by the DMTK. 
+
+
+The following algorithms will be  compared.
+\begin{itemize}
+\item \textbf{PetuumSGD:} The distributed version of SGD is implemented by using the asynchronous communication protocol, i.e., SSP \cite{Xing:2015ib}.  The learning rate in PetuumSGD is decayed with a fixed factor $0.95$ at the end of an epoch.  
+\item \textbf{SSGD:} It is the state-of-the-art distributed version of SGD, which adopts the variance reduction technique \cite{Zhang:2015tp}. The update rule in the SSGD has a variable $\theta$ which is used to update the parameters asynchronously. The details of SSGD can be referred in \cite{Zhang:2015tp}. Here, we set $\theta=0.5$.
+\item \textbf{DisSVRG-tricks:} DisSVRG is evaluated with all the optimization tricks.
+\item \textbf{DisSVRG-without-tricks:} DisSVRG is evaluated without any an optimization tricks.
+\end{itemize}
+\subsection{Convergence}
+
+As illustrated in Fig. \ref{figure_evaluation1_convergence}, the  convergence performance of the algorithms has been evaluated. The delay is set $50$ when those machine learning algorithms adopt the asynchronous communication protocol. All the datasets are handled on $32$ workers.  It is obvious that DisSVRG with the optimization tricks outperforms other algorithms for all the datasets.  Even though DisSVRG does not use any an optimization trick, it always performs better than PetuumSGD, and gains a better performance than SSGD for the \emph{dna} dataset. In specific, in order to decrease the loss function to $0.1$, DisSVRG with all the optimization tricks spends one forth and one third time of the PetuumSGD for the datasets \emph{YearPredictMSD} and \emph{dna}, respectively.  The main reason is that DisSVRG adopts asynchronous communication protocol as well as the variance reduction technique to update the parameters, thus better than any of the existing algorithms. Additionally, the  learning rate with an accelerated factor speeds up the convergence. Meanwhile, the adaptive sampling strategy significantly reduces the underlying wait time which is used to accelerate the convergence of DisSVRG in reverse. 
+
+\begin{figure*}
+\centering
+\subfigure[\emph{YearPredictMSD}]{\includegraphics[width=0.86\columnwidth]{figures/evaluation1_converage}}
+\subfigure[\emph{dna}]{\includegraphics[width=0.86\columnwidth]{figures/evaluation1_dna_converage}}
+\caption{The performance of the convergence is compared by using $32$ computing nodes.}
+\label{figure_evaluation1_convergence}
+\end{figure*}
+
+\begin{figure*}
+\centering
+\subfigure[\emph{YearPredictMSD}]{\includegraphics[width=0.86\columnwidth]{figures/evaluation2_speedup}}
+\subfigure[\emph{dna}]{\includegraphics[width=0.86\columnwidth]{figures/evaluation2_speedup_dna}}
+\caption{DisSVRG obtains almost linear speedup when varying the number of workers.}
+\label{figure_evaluation2_speedup}
+\end{figure*}
+
+\begin{figure*}
+\centering
+\subfigure[\emph{YearPredictMSD}]{\includegraphics[width=0.86\columnwidth]{figures/evaluation3_delay}}
+\subfigure[\emph{dna}]{\includegraphics[width=0.86\columnwidth]{figures/evaluation3_delay_dna}}
+\caption{The time consumption is compared by varying the delay $\tau$ for $128$ workers.}
+\label{figure_evaluation3_delay}
+\end{figure*}
+
+
+
+
+
+
+\subsection{Speedup}
+As illustrated in Fig. \ref{figure_evaluation2_speedup},  we compare the convergence performance of DisSVRG by varying the number of workers in a cluster. It is obvious that DisSVRG converges fast with a large number of workers.  During the iterations, the more workers are used to update the local parameters, the more new learned parameters will be aggregated with the global parameters. After that,  the global parameters which contains the new learned updates of parameters will be shared with other workers for the next iteration, thus accelerating the convergence of other workers.  In specific,  DisSVRG obtains appriximately linear speedup when varying the number of workers. For instance, DisSVRG gains $19\times$ speedup on the dataset \emph{YearPredictMSD} when using $32$ workers. DisSVRG even keeps the linear speedup when using $128$ workers for the dataset \emph{dna}. The approximately linear speedup mainly benefits from the asynchronous communication protocol and the variance reduction technique. The asynchronous communication protocol relaxes the bound of the synchronization among workers, which alleviates the straggler problem, and thus decreases the wait time. The variance reduction technique reduces the variance of SGD, and keeps DisSVRG converging at a constant rate. 
+
+
+\subsection{Wait time}
+As shown in Fig. \ref{figure_evaluation3_delay}, we evaluate the average time consumption of DisSVRG by varying the value of the delay $\tau$. It is obvious when the delay $\tau$ is small, the average wait time is large. A small delay means a tight bound among workers, which usually leads to the wait time for the fast workers due to the asynchronous communication protocol. For example, when the delay is set $0$, all the workers should be synchronized for each iteration, thus waiting the most time. It is noting that the wait time decreases sharply when the delay becomes large. We concludes that a relax bound is effective to reduce the average wait time. Meanwhile, the average computing time will increase slightly with the relax bound of the delay. Although the fast workers have more freedom to conduct the iterations with the relax bound of the delay, the slow workers cannot obtain the new learned parameters from the fast workers within the large delay. The slow workers thus cannot  benefit from the fast peers.   In a nutshell, the delay should not be identified either too small or too large. It is a tradeoff between the wait time and the computing time for the workers. Generally, the delay should be set to minimize the total time consumption of DisSVRG. In our evaluation tests, the delay $\tau$ should be set $200$ for the dataset \emph{YearPredictMSD}, and $50$ for the dataset \emph{dna}. 
+
+
+
+
+
+
 
 
 
 
 \section{Conclusion}
 \label{conclusion}
+Distributed SGD is an effective way to solve the large scale learning problems. In this paper, we propose a version of distributed SGD named DisSVRG with combing the asynchronous communication protocol and the variance reduction technique. Exploiting the properties of the loss function, DisSVRG is optimized by using a learning rate with the accelerated factor. Additionally,  in order to reduce the wait time caused by the straggler problem, we propose an adaptive sampling strategy during the iterations. The adaptive sampling strategy gives the slow workers a chance to catch up the fast peers during iterations, thus alleviating the straggler problem. Extensive empirical studies show that DisSVRG converges faster than the state-of-the-art version of SGD, and can gain approximately linear speedup in a cluster. 
+
+
+
+
+
 
 
 \balance
@@ -285,7 +357,8 @@ Additionally, comparing with the SGD in \cite{Zhang:2015tp}, our SGD adopts a mo
 
   \section*{Acknowledgment}
 \fi
-The work is partially supported by the National Natural Science Foundation of China (NSFC) under Grants NO. 61402494, NO. 61402513, NO. 61202487, NO. 61170287, NO. 61232016. Besides, the project is sponsored by the Scientific Research Foundation of GuangXi University under Grant No. XGZ141182.
+This work was  supported by the National Natural Science Foundation of China (Project NO. 60970034, 61170287, 61232016, 61303189 and 31501073).
+%The work is partially supported by the National Natural Science Foundation of China (NSFC) under Grants NO. 61402494, NO. 61402513, NO. 61202487, NO. 61170287, NO. 61232016. Besides, the project is sponsored by the Scientific Research Foundation of GuangXi University under Grant No. XGZ141182.
 
 
 \bibliographystyle{IEEEtran}

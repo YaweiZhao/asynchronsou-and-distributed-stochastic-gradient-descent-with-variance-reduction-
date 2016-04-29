@@ -48,14 +48,20 @@ x4=[]
 y4=[]
 
 read_x(x1,y1,x2,y2,x3,y3,x4,y4)
-plt.plot(x3,y3,'-b',label="$\\theta=10^{-6},\,constant$")
-plt.plot(x4,y4,'--b',label="$\\theta=10^{-6},\,accelerated$")
-plt.plot(x1,y1,'-r',label="$\\theta=10^{-5},\,constant$")
-plt.plot(x2,y2,'--r',label="$\\theta=10^{-5},\,accelerated$")
-plt.ylabel("Objective value")
-plt.xlabel("Time (s)")
+plt.plot(x3,y3,'-b',linewidth=2.5,label="$\\theta=10^{-6},\,constant$")
+plt.plot(x4,y4,'--b',linewidth=2.5,label="$\\theta=10^{-6},\,accelerated$")
+plt.plot(x1,y1,'-r',linewidth=2.5,label="$\\theta=10^{-5},\,constant$")
+plt.plot(x2,y2,'--r',linewidth=2.5,label="$\\theta=10^{-5},\,accelerated$")
+plt.xticks(fontsize=16) 
+plt.yticks(fontsize=16) 
 
-plt.legend(bbox_to_anchor=(0.99,0.55))
+plt.ylabel("Objective value",fontsize=18)
+plt.xlabel("Time (s)",fontsize=18)
+
+leg=plt.legend(bbox_to_anchor=(0.99,0.57))
+for t in leg.get_texts(): 
+     t.set_fontsize(16) 
+
 plt.show()
 
 
